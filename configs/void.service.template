@@ -1,0 +1,16 @@
+[Unit]
+Description= Ethereum SERVICE_NAME node systemd service
+Documentation=DOCS_LINK
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=USER_NAME
+Group=USER_GROUP
+ExecStart=EXEC_LINE
+SyslogIdentifier=SERVICE_NAME
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
