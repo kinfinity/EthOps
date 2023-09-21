@@ -11,6 +11,7 @@ if [[ $# -ne 0 ]]; then
 fi
 
 run_geth() {
+    # geth console
     geth console --syncmode $1 --http --http.api "eth,debug"
     # geth console --config ../configs/geth_config.toml --syncmode light
 }

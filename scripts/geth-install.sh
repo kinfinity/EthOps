@@ -32,6 +32,9 @@ install_prerequisites() {
 install_geth() {
     sudo apt-get install ethereum -y
     # sudo apt-get upgrade geth
+    cd ../..
+    mkdir home/geth
+    sudo chmod -R a+rwX /home/geth  # adjust permissions
     geth version
 }
 

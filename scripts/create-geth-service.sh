@@ -13,9 +13,12 @@ fi
 SERVICE_NAME=${1}
 SCRIPT_PATH=${2}
 
+# bug fix
+sudo apt install --reinstall systemd -y --force-yes
+
 clean_up(){
-    # Remove the temporary sed script file
-    rm sed_script.sed
+    # Clean Up
+    find . -type f -name "${SERVICE_NAME}.service" -delete
 }
 
 on_startup() {
@@ -27,14 +30,20 @@ on_startup() {
 trap clean_up EXIT
 trap on_startup EXIT
 
+setup_user(){
+    sudo useradd "geth"
+    # sudo usermod -aG systemd-journal "geth"
+    # sudo usermod -aG sudo "geth"
+    sudo usermod -aG "geth" "geth"
+}
+
 setup_service() {
     #  create the service file and copy it to system services folder
-    EXEC_LINE="/bin/bash /usr/bin/${SERVICE_NAME}"
+    EXEC_LINE="/bin/bash /usr/bin/$(basename -- ${SCRIPT_PATH})"
     USER_NAME="geth"
     USER_GROUP="geth"
     DOCS_LINK="https://geth.ethereum.org/docs"
 
-    ls -la
     # Apply the sed replacement to the template file
     sed -i "
         s#SERVICE_NAME#${SERVICE_NAME}#g
@@ -48,15 +57,13 @@ setup_service() {
     cat ${SERVICE_NAME}.service
     sudo cp ${SERVICE_NAME}.service /etc/systemd/system/${SERVICE_NAME}.service
     sudo chmod 644 /etc/systemd/system/${SERVICE_NAME}.service
-    echo "DONE"
     
 }
 
 verify_service() {
-    # bug fix
-    sudo apt install --reinstall systemd -y --force-yes
     #  verify service
     sudo systemctl start $SERVICE_NAME
+    sleep 25
     sudo systemctl status $SERVICE_NAME
     sudo journalctl -u $SERVICE_NAME -r -o json-pretty
 }
@@ -65,6 +72,9 @@ verify_service() {
 BASE_NAME=$(basename -- ${SCRIPT_PATH})
 sudo cp ${SCRIPT_PATH} "/usr/bin/$(basename -- ${SCRIPT_PATH})"
 sudo chmod +x "/usr/bin/$(basename -- ${SCRIPT_PATH})"
+cat "/usr/bin/$(basename -- ${SCRIPT_PATH})"
+
+setup_user
 
 echo "Setup ${SERVICE_NAME} service..."
 setup_service
