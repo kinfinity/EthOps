@@ -6,8 +6,8 @@ servers=[
     :name => "PUB_NODE",
     :ram => 8192,
     :cpus => 2,
-    :index => 1,
-    :ipaddress => "192.168.56.16"
+    :index => 2,
+    :ipaddress => "192.168.33.10"
   }
 ]
 
@@ -16,8 +16,12 @@ Vagrant.configure("2") do |config|
   ## copy scripts to the server and run them
   config.vm.synced_folder "../../scripts", "/home/vagrant/scripts", type: "rsync"
   config.vm.synced_folder "../../configs", "/home/vagrant/configs", type: "rsync"
-  config.ssh.private_key_path = "~/.ssh/id_rsa"  # make use of local private key
+  config.ssh.insert_key = false
+  # config.ssh.private_key_path = "~/.ssh/id_rsa"  # make use of local private key
+  # config.vm.provision "file", source: "~/.ssh/id_rsa.pub", destination: "~/.ssh/me.pub"
+  # config.vm.provision "shell", inline: "cat ~vagrant/.ssh/me.pub >> ~vagrant/.ssh/authorized_keys"
   config.ssh.forward_agent = true
+  # config.vm.boot_timeout
 
   servers.each do |machine|
     
@@ -29,10 +33,13 @@ Vagrant.configure("2") do |config|
       node.ssh.username = "vagrant"
       node.ssh.password = "vagrant"
       node.vm.network "private_network", ip: machine[:ipaddress]
+      node.vm.network "forwarded_port", guest: 3000, host: "#{3000}", id: "grafana"
+      node.vm.network "forwarded_port", guest: 8086, host: "#{8086}", id: "influxdb"
+      node.vm.network "forwarded_port", guest: 9090, host: "#{9090}", id: "prometheus"
       node.vm.network "forwarded_port", guest: 8545, host: "#{8545 + machine[:index] }", id: "geth" # 
       node.vm.network "forwarded_port", guest: 30303, host: "#{30303 + machine[:index] }", protocol: "tcp" # 
       node.vm.network "forwarded_port", guest: 65233, host: "#{65233}", protocol: "udp" # + machine[:index]
-      node.vm.network "forwarded_port", guest: 22, host: "#{22 + machine[:index] }",  auto_correct: false, id: "ssh"
+      node.vm.network "forwarded_port", guest: 22, host: "#{22}",  auto_correct: true, id: "ssh"
 
       node.vm.provider "virtualbox" do |eth_vb|
 
@@ -40,12 +47,30 @@ Vagrant.configure("2") do |config|
         eth_vb.memory = machine[:ram]
         eth_vb.cpus = machine[:cpus]
 
+        # Bootstrap
+        node.vm.provision "shell", path: "../../scripts/bootstrap.sh"
+
         # Eth - Execution Client
         ## setup geth
         node.vm.provision "shell", path: "../../scripts/geth-install.sh", powershell_elevated_interactive: true
         node.vm.provision "shell", path: "../../scripts/create-geth-service.sh",args: ["PUB_NODE", "./scripts/run-geth.sh"], powershell_elevated_interactive: true
 
-        # 
+        # Monitoring
+        ## setup influxDB
+        node.vm.provision "shell", path: "../../tools/influxDB/influx.sh", powershell_elevated_interactive: true
+
+        ### Install Docker on the VM for Grafana and Prometheus
+        node.vm.provision "shell", path: "../../tools/dockerEngine/docker.sh", powershell_elevated_interactive: true
+
+        # setup prometheus
+        node.vm.provision "shell", path: "../../tools/prometheus/prometheus.sh", powershell_elevated_interactive: true
+        node.vm.provision "shell", path: "../../scripts/create-prometheus-service.sh",args: ["gethprometheus"], powershell_elevated_interactive: true
+
+        # setup grafana
+        node.vm.provision "shell", path: "../../tools/grafana/grafana.sh", powershell_elevated_interactive: true
+        
+        # setup
+        node.vm.provision "shell", path: "../../scripts/monitor-geth.sh", powershell_elevated_interactive: true
 
       end
     end
